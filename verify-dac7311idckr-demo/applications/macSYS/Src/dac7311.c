@@ -54,7 +54,7 @@ static void dac7311_write_frame(uint16_t data)
 {
     /* Pull SYNC low to start transaction */
     HAL_GPIO_WritePin(DAC_SYNC_PORT, DAC_SYNC_PIN, GPIO_PIN_RESET);
-    for (volatile int i = 0; i < 10; i++);  /* SYNC setup time */
+    for (volatile int i = 0; i < 50; i++);  /* SYNC setup time (~700ns) */
 
     /* Clock out 16 bits, MSB first */
     for (int8_t bit = 15; bit >= 0; bit--) {
@@ -65,17 +65,17 @@ static void dac7311_write_frame(uint16_t data)
             HAL_GPIO_WritePin(DAC_DIN_PORT, DAC_DIN_PIN, GPIO_PIN_RESET);
         }
 
-        for (volatile int i = 0; i < 10; i++);  /* Data setup time (~140ns) */
+        for (volatile int i = 0; i < 20; i++);  /* Data setup time (~280ns) */
 
         /* SCLK rising edge */
         HAL_GPIO_WritePin(DAC_SCLK_PORT, DAC_SCLK_PIN, GPIO_PIN_SET);
 
-        for (volatile int i = 0; i < 10; i++);  /* Clock high time (~140ns) */
+        for (volatile int i = 0; i < 20; i++);  /* Clock high time (~280ns) */
 
         /* SCLK falling edge */
         HAL_GPIO_WritePin(DAC_SCLK_PORT, DAC_SCLK_PIN, GPIO_PIN_RESET);
 
-        for (volatile int i = 0; i < 10; i++);  /* Clock low time (~140ns) */
+        for (volatile int i = 0; i < 20; i++);  /* Clock low time (~280ns) */
     }
 
     /* Pull SYNC high to latch data */
