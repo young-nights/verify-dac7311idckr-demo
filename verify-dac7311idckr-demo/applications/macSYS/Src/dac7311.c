@@ -125,6 +125,8 @@ void dac7311_set_voltage(float voltage)
     /* Build 16-bit frame: [XX PD1=0 PD0=0 D11..D0] */
     uint16_t frame = (DAC7311_PD_NORMAL << 12) | value;
 
+    rt_kprintf("[DAC7311] volt=%.3f raw=%d frame=0x%04X\n", voltage, value, frame);
+
     /* Write to DAC */
     dac7311_write_frame(frame);
 
