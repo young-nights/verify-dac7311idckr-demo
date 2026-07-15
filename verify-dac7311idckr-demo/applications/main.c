@@ -126,3 +126,63 @@ static int dac(int argc, char **argv)
     return RT_EOK;
 }
 MSH_CMD_EXPORT(dac, DAC7311 control: dac volt/raw/pct/pd/info <value>);
+
+/* ============================================================================ *  Diagnostic command: dacdiag
+ *  Reads GPIOB registers and manually toggles pins for hardware verification.
+ * ===========================================================================*/
+static int dacdiag(int argc, char **argv)
+{
+    GPIO_TypeDef *port = GPIOB;
+
+    rt_kprintf("=== DAC7311 GPIO Diagnostic ===\n");
+
+    /* Check RCC clock enable bit for GPIOB */
+    uint32_t apb2enr = RCC->APB2ENR;
+    rt_kprintf("[RCC] APB2ENR    = 0x%08X\n", (unsigned)apb2enr);
+    rt_kprintf("[RCC] GPIOB EN   = %s\n", (apb2enr & RCC_APB2ENR_IOPBEN) ? "YES" : "NO");
+
+    /* Read GPIOB configuration registers */
+    rt_kprintf("[GPIOB] CRL      = 0x%08X  (pins 0-7)\n", (unsigned)port->CRL);
+    rt_kprintf("[GPIOB] CRH      = 0x%08X  (pins 8-15)\n", (unsigned)port->CRH);
+    rt_kprintf("[GPIOB] IDR      = 0x%04X    (input state)\n", (unsigned)port->IDR);
+    rt_kprintf("[GPIOB] ODR      = 0x%04X    (output state)\n", (unsigned)port->ODR);
+
+    /* Decode pin modes from CRH (pins 8,9 are in CRH) */
+    uint32_t crh = port->CRH;
+    uint32_t mode8 = crh & 0xF;        /* PB8 CNF+MODE bits */
+    uint32_t mode9 = (crh >> 4) & 0xF;  /* PB9 CNF+MODE bits */
+    rt_kprintf("[PB8] CRH bits = 0x%X -> ", (unsigned)mode8);
+    if ((mode8 & 0x3) == 0x0) rt_kprintf("Input\n");
+    else if ((mode8 & 0x3) == 0x1) rt_kprintf("Output 10MHz %s\n", (mode8 & 0x4) ? "Open-Drain" : "Push-Pull");
+    else if ((mode8 & 0x3) == 0x2) rt_kprintf("Output 2MHz %s\n", (mode8 & 0x4) ? "Open-Drain" : "Push-Pull");
+    else if ((mode8 & 0x3) == 0x3) rt_kprintf("Output 50MHz %s\n", (mode8 & 0x4) ? "Open-Drain" : "Push-Pull");
+
+    rt_kprintf("[PB9] CRH bits = 0x%X -> ", (unsigned)mode9);
+    if ((mode9 & 0x3) == 0x0) rt_kprintf("Input\n");
+    else if ((mode9 & 0x3) == 0x1) rt_kprintf("Output 10MHz %s\n", (mode9 & 0x4) ? "Open-Drain" : "Push-Pull");
+    else if ((mode9 & 0x3) == 0x2) rt_kprintf("Output 2MHz %s\n", (mode9 & 0x4) ? "Open-Drain" : "Push-Pull");
+    else if ((mode9 & 0x3) == 0x3) rt_kprintf("Output 50MHz %s\n", (mode9 & 0x4) ? "Open-Drain" : "Push-Pull");
+
+    /* Manual pin toggle test */
+    rt_kprintf("\n--- Manual Toggle Test (measure PB8/PB9 with multimeter) ---\n");
+
+    /* Force PB8 HIGH */
+    port->BSRR = GPIO_PIN_8;
+    rt_kprintf("[TEST] PB8 = HIGH, PB9 = LOW\n");
+    rt_thread_mdelay(2000);
+
+    /* Force PB9 HIGH */
+    port->BSRR = GPIO_PIN_9;
+    port->BRR = GPIO_PIN_8;
+    rt_kprintf("[TEST] PB8 = LOW, PB9 = HIGH\n");
+    rt_thread_mdelay(2000);
+
+    /* Restore idle */
+    port->BSRR = GPIO_PIN_7;  /* SYNC HIGH */
+    port->BRR = GPIO_PIN_8;   /* SCLK LOW */
+    port->BRR = GPIO_PIN_9;   /* DIN LOW */
+    rt_kprintf("[TEST] Restored idle state\n");
+
+    return RT_EOK;
+}
+MSH_CMD_EXPORT(dacdiag, DAC7311 GPIO diagnostic: read registers + toggle test);
