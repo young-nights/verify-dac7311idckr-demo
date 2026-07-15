@@ -94,9 +94,10 @@ void dac7311_init(void)
     /* Enable GPIOB clock */
     __HAL_RCC_GPIOB_CLK_ENABLE();
 
-    /* Configure SYNC (PB7), SCLK (PB8), DIN (PB9) as push-pull outputs */
+    /* Configure SYNC (PB7), SCLK (PB8), DIN (PB9) as open-drain outputs
+     * with external 5V pull-ups. This ensures DAC7311 sees valid 5V logic HIGH. */
     gpio.Pin   = DAC_SYNC_PIN | DAC_SCLK_PIN | DAC_DIN_PIN;
-    gpio.Mode  = GPIO_MODE_OUTPUT_PP;
+    gpio.Mode  = GPIO_MODE_OUTPUT_OD;
     gpio.Speed = GPIO_SPEED_FREQ_HIGH;
     gpio.Pull  = GPIO_NOPULL;
     HAL_GPIO_Init(GPIOB, &gpio);
