@@ -80,7 +80,7 @@ int main(void)
  *    dac pd <mode>        - Power-down (0=normal, 1=1k, 2=100k, 3=HiZ)
  *    dac info             - Show current status
  * ===========================================================================*/
-static int cmd_dac(int argc, char **argv)
+static int dac(int argc, char **argv)
 {
     if (argc < 2) {
         rt_kprintf("Usage:\n");
@@ -125,4 +125,4 @@ static int cmd_dac(int argc, char **argv)
 
     return RT_EOK;
 }
-MSH_CMD_EXPORT(cmd_dac, DAC7311 control: dac volt/raw/pct/pd/info <value>);
+MSH_CMD_EXPORT(dac, DAC7311 control: dac volt/raw/pct/pd/info <value>);
