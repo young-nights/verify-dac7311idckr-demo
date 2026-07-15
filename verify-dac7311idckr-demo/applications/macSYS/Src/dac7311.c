@@ -10,7 +10,7 @@
  * DAC7311: 12-bit, single-channel, SPI DAC (Texas Instruments)
  * - SPI Mode 0 (CPOL=0, CPHA=0), MSB first
  * - 16-bit frame: [X X PD1 PD0 D11 D10 ... D0]
- * - VOUT = VREF * D / 4096 (VREF = VDD = 5V)
+ * - VOUT = VREF * D / 4096 (VREF = VDD)
  *
  * Hardware:
  *   PB7  -> SYNC (chip select, active low)
@@ -22,65 +22,78 @@
 #include "main.h"
 
 /* ============================================================================
- *  GPIO Pin Definitions
+ *  GPIO Pin Definitions (direct register access)
  * ===========================================================================*/
-#define DAC_SYNC_PORT       GPIOB
 #define DAC_SYNC_PIN        GPIO_PIN_7
-
-#define DAC_SCLK_PORT       GPIOB
 #define DAC_SCLK_PIN        GPIO_PIN_8
-
-#define DAC_DIN_PORT        GPIOB
 #define DAC_DIN_PIN         GPIO_PIN_9
+#define DAC_GPIO_PORT       GPIOB
 
 /* ============================================================================
  *  Internal State
  * ===========================================================================*/
-static float s_dac_voltage = 0.0f;  /* Current output voltage */
-static uint16_t s_dac_raw = 0;      /* Current raw 12-bit value */
+static float s_dac_voltage = 0.0f;
+static uint16_t s_dac_raw = 0;
 
 /* ============================================================================
- *  Internal: GPIO Bit-Bang SPI
+ *  Precise Delay (72MHz SYSCLK)
+ * ===========================================================================*/
+
+/**
+ * @brief  Blocking delay ~1us per call (tuned for 72MHz).
+ *         Uses inline assembly to prevent compiler optimization.
+ */
+static void dac_delay(void)
+{
+    /* ~10 NOPs ~= 140ns at 72MHz. Generous for DAC7311 timing. */
+    __asm__ volatile("nop"); __asm__ volatile("nop");
+    __asm__ volatile("nop"); __asm__ volatile("nop");
+    __asm__ volatile("nop"); __asm__ volatile("nop");
+    __asm__ volatile("nop"); __asm__ volatile("nop");
+    __asm__ volatile("nop"); __asm__ volatile("nop");
+}
+
+/* ============================================================================
+ *  Internal: GPIO Bit-Bang SPI (BSRR register, no HAL overhead)
  * ===========================================================================*/
 
 /**
  * @brief  Write 16-bit frame to DAC7311 via software SPI.
- *         Frame format: [D15 D14 PD1 PD0 D11 D10 ... D0]
+ *         Uses direct BSRR/BRR register access for deterministic timing.
  *         SPI Mode 0: CPOL=0, CPHA=0, MSB first.
- *
- * @param  data  16-bit frame data.
  */
 static void dac7311_write_frame(uint16_t data)
 {
-    /* Pull SYNC low to start transaction */
-    HAL_GPIO_WritePin(DAC_SYNC_PORT, DAC_SYNC_PIN, GPIO_PIN_RESET);
-    for (volatile int i = 0; i < 50; i++);  /* SYNC setup time (~700ns) */
+    GPIO_TypeDef *port = DAC_GPIO_PORT;
 
-    /* Clock out 16 bits, MSB first */
+    /* ---- Start: Pull SYNC low ---- */
+    port->BRR = DAC_SYNC_PIN;
+    dac_delay(); dac_delay();
+
+    /* ---- Clock out 16 bits, MSB first ---- */
     for (int8_t bit = 15; bit >= 0; bit--) {
-        /* Set DIN before rising edge */
+
+        /* Set DIN before SCLK rising edge */
         if (data & (1 << bit)) {
-            HAL_GPIO_WritePin(DAC_DIN_PORT, DAC_DIN_PIN, GPIO_PIN_SET);
+            port->BSRR = DAC_DIN_PIN;    /* DIN = HIGH */
         } else {
-            HAL_GPIO_WritePin(DAC_DIN_PORT, DAC_DIN_PIN, GPIO_PIN_RESET);
+            port->BRR  = DAC_DIN_PIN;    /* DIN = LOW  */
         }
 
-        for (volatile int i = 0; i < 20; i++);  /* Data setup time (~280ns) */
+        dac_delay();  /* Data setup time */
 
-        /* SCLK rising edge */
-        HAL_GPIO_WritePin(DAC_SCLK_PORT, DAC_SCLK_PIN, GPIO_PIN_SET);
-
-        for (volatile int i = 0; i < 20; i++);  /* Clock high time (~280ns) */
+        /* SCLK rising edge (latch data) */
+        port->BSRR = DAC_SCLK_PIN;
+        dac_delay();  /* Clock high time */
 
         /* SCLK falling edge */
-        HAL_GPIO_WritePin(DAC_SCLK_PORT, DAC_SCLK_PIN, GPIO_PIN_RESET);
-
-        for (volatile int i = 0; i < 20; i++);  /* Clock low time (~280ns) */
+        port->BRR = DAC_SCLK_PIN;
+        dac_delay();  /* Clock low time */
     }
 
-    /* Pull SYNC high to latch data */
-    for (volatile int i = 0; i < 10; i++);  /* Last bit hold time */
-    HAL_GPIO_WritePin(DAC_SYNC_PORT, DAC_SYNC_PIN, GPIO_PIN_SET);
+    /* ---- Latch: Pull SYNC high ---- */
+    dac_delay();
+    port->BSRR = DAC_SYNC_PIN;
 }
 
 /* ============================================================================
@@ -94,23 +107,23 @@ void dac7311_init(void)
     /* Enable GPIOB clock */
     __HAL_RCC_GPIOB_CLK_ENABLE();
 
-    /* Configure SYNC (PB7), SCLK (PB8), DIN (PB9) as open-drain outputs
-     * with external 5V pull-ups. This ensures DAC7311 sees valid 5V logic HIGH. */
+    /* Configure SYNC (PB7), SCLK (PB8), DIN (PB9) as open-drain outputs.
+     * External 5V pull-ups ensure DAC7311 sees valid logic HIGH. */
     gpio.Pin   = DAC_SYNC_PIN | DAC_SCLK_PIN | DAC_DIN_PIN;
     gpio.Mode  = GPIO_MODE_OUTPUT_OD;
     gpio.Speed = GPIO_SPEED_FREQ_HIGH;
     gpio.Pull  = GPIO_NOPULL;
-    HAL_GPIO_Init(GPIOB, &gpio);
+    HAL_GPIO_Init(DAC_GPIO_PORT, &gpio);
 
     /* Set idle state: SYNC=HIGH, SCLK=LOW, DIN=LOW */
-    HAL_GPIO_WritePin(DAC_SYNC_PORT, DAC_SYNC_PIN, GPIO_PIN_SET);
-    HAL_GPIO_WritePin(DAC_SCLK_PORT, DAC_SCLK_PIN, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(DAC_DIN_PORT, DAC_DIN_PIN, GPIO_PIN_RESET);
+    DAC_GPIO_PORT->BSRR = DAC_SYNC_PIN;       /* SYNC = HIGH */
+    DAC_GPIO_PORT->BRR  = DAC_SCLK_PIN;       /* SCLK = LOW  */
+    DAC_GPIO_PORT->BRR  = DAC_DIN_PIN;        /* DIN  = LOW  */
 
     /* Output 0V */
     dac7311_set_voltage(0.0f);
 
-    rt_kprintf("[DAC7311] Initialized, output=0.00V\n");
+    rt_kprintf("[DAC7311] Initialized (open-drain + 5V pull-up), output=0.00V\n");
 }
 
 void dac7311_set_voltage(float voltage)
@@ -126,14 +139,14 @@ void dac7311_set_voltage(float voltage)
     /* Build 16-bit frame: [XX PD1=0 PD0=0 D11..D0] */
     uint16_t frame = (DAC7311_PD_NORMAL << 12) | value;
 
-    rt_kprintf("[DAC7311] volt=%.3f raw=%d frame=0x%04X\n", voltage, value, frame);
-
     /* Write to DAC */
     dac7311_write_frame(frame);
 
     /* Update state */
     s_dac_raw = value;
     s_dac_voltage = voltage;
+
+    rt_kprintf("[DAC7311] set %.3fV -> raw=%d frame=0x%04X\n", voltage, value, frame);
 }
 
 void dac7311_set_raw(uint16_t value)
@@ -157,7 +170,6 @@ void dac7311_set_percent(uint8_t percent)
 
 void dac7311_power_down(uint8_t mode)
 {
-    /* Power-down frame: [XX PD1 PD0 0...0] */
     uint16_t frame = ((uint16_t)(mode & 0x03) << 12);
     dac7311_write_frame(frame);
 
