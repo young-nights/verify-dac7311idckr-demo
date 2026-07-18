@@ -167,6 +167,7 @@ static void test_timer_cb(void *parameter)
     (void)parameter;
     dac7311_write_raw_frame(s_test_frame);
     s_test_count++;
+//    rt_kprintf("ok\n");
 }
 
 static void test_start(uint16_t frame, uint32_t interval_ms)
@@ -358,16 +359,18 @@ static int dac(int argc, char **argv)
     } else if (rt_strcmp(argv[1], "test") == 0) {
         if (argc < 3) {
             rt_kprintf("Usage:\n");
-            rt_kprintf("  dac test [interval_ms] [hex_frame]  Repeat SPI frame\n");
-            rt_kprintf("  dac test stop                       Stop test mode\n");
-            rt_kprintf("  dac test info                       Show status\n");
-            rt_kprintf("  Defaults: interval=10ms, frame=0x8000 (2.5V)\n");
+            rt_kprintf("  dac test [interval_ms] [hex_frame] [clk_us]  Repeat SPI frame\n");
+            rt_kprintf("  dac test stop                                Stop test mode\n");
+            rt_kprintf("  dac test info                                Show status\n");
+            rt_kprintf("  Defaults: interval=10ms, frame=0x8000, clk=0 (fast)\n");
+            rt_kprintf("  clk_us: SCLK high/low time in us (0=fast, 1000=1ms per half-clock)\n");
             rt_kprintf("\n  Probe: PB7=SYNC, PB8=SCLK, PB9=DIN\n");
             return -RT_ERROR;
         }
 
         if (rt_strcmp(argv[2], "stop") == 0) {
             test_stop();
+            dac7311_set_delay(0);  /* restore fast mode */
             rt_kprintf("[TEST] Stopped (sent %d frames)\n", (int)s_test_count);
         } else if (rt_strcmp(argv[2], "info") == 0) {
             if (s_test_timer == RT_NULL) {
@@ -376,24 +379,38 @@ static int dac(int argc, char **argv)
                 rt_kprintf("[TEST] Active\n");
                 rt_kprintf("  Frame:    0x%04X\n", s_test_frame);
                 rt_kprintf("  Sent:     %d frames\n", (int)s_test_count);
+                if (dac7311_get_delay() == 0)
+                    rt_kprintf("  SCLK:     fast (~140ns)\n");
+                else
+                    rt_kprintf("  SCLK:     %d us per half-clock\n", (int)dac7311_get_delay());
                 rt_kprintf("  Probe:    PB7=SYNC, PB8=SCLK, PB9=DIN\n");
                 rt_kprintf("  Trigger:  Set scope to trigger on SYNC falling edge\n");
             }
         } else {
             uint32_t interval = (argc > 2) ? atoi(argv[2]) : 10;
             uint16_t frame    = (argc > 3) ? (uint16_t)strtol(argv[3], RT_NULL, 16) : 0x8000;
+            uint32_t clk_us   = (argc > 4) ? atoi(argv[4]) : 0;
             if (interval < 1) interval = 1;
             if (interval > 10000) interval = 10000;
 
+            dac7311_set_delay(clk_us);
             test_start(frame, interval);
+
+            /* Calculate actual frame duration: 16 bits * 3 delays/bit */
+            uint32_t frame_us = clk_us > 0 ? (16 * 3 * clk_us) : (16 * 3 * 140 / 1000);
             rt_kprintf("[TEST] Started: frame=0x%04X, interval=%dms\n", frame, (int)interval);
+            if (clk_us == 0)
+                rt_kprintf("[TEST] SCLK delay: fast (~140ns)\n");
+            else {
+                rt_kprintf("[TEST] SCLK delay: %d us per half-clock\n", (int)clk_us);
+                rt_kprintf("[TEST] Frame time: ~%d us (16 bits x 3 steps)\n", (int)(16 * 3 * clk_us));
+            }
             rt_kprintf("[TEST] Probe: PB7=SYNC, PB8=SCLK, PB9=DIN\n");
             rt_kprintf("[TEST] Scope trigger: SYNC falling edge\n");
-            rt_kprintf("[TEST] Expected: 16 SCLK cycles per SYNC low pulse\n");
             rt_kprintf("[TEST] Frame bits: ");
             for (int b = 15; b >= 0; b--) {
                 rt_kprintf("%d", (frame >> b) & 1);
-                if (b == 14 || b == 12) rt_kprintf(" ");  /* visual separator */
+                if (b == 14 || b == 12) rt_kprintf(" ");
             }
             rt_kprintf("\n");
             rt_kprintf("[TEST]          [X][X][PD1][PD0][D11..D0]\n");

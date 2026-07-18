@@ -90,6 +90,18 @@ float dac7311_get_voltage(void);
  */
 void dac7311_write_raw_frame(uint16_t frame);
 
+/**
+ * @brief  Set SPI clock delay (controls SCLK high/low time).
+ * @param  delay_us  Delay in microseconds. 0 = fast mode (~140ns).
+ */
+void dac7311_set_delay(uint32_t delay_us);
+
+/**
+ * @brief  Get current SPI clock delay.
+ * @return Delay in microseconds (0 = fast mode).
+ */
+uint32_t dac7311_get_delay(void);
+
 #ifdef __cplusplus
 }
 #endif

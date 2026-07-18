@@ -34,23 +34,45 @@
  * ===========================================================================*/
 static float s_dac_voltage = 0.0f;
 static uint16_t s_dac_raw = 0;
+static uint32_t s_dac_delay_us = 0;  /* 0 = fast mode (NOP), >0 = delay per step in us */
 
 /* ============================================================================
- *  Precise Delay (72MHz SYSCLK)
+ *  Configurable Delay
  * ===========================================================================*/
 
 /**
- * @brief  Blocking delay ~1us per call (tuned for 72MHz).
- *         Uses inline assembly to prevent compiler optimization.
+ * @brief  Set SPI clock delay. Controls SCLK high/low time.
+ * @param  delay_us  Delay per step in microseconds. 0 = fast mode (~140ns).
+ */
+void dac7311_set_delay(uint32_t delay_us)
+{
+    s_dac_delay_us = delay_us;
+}
+
+uint32_t dac7311_get_delay(void)
+{
+    return s_dac_delay_us;
+}
+
+/**
+ * @brief  SPI clock step delay.
+ *         If s_dac_delay_us == 0: fast mode, ~140ns NOP-based.
+ *         If s_dac_delay_us > 0:  blocking delay in microseconds.
  */
 static void dac_delay(void)
 {
-    /* ~10 NOPs ~= 140ns at 72MHz. Generous for DAC7311 timing. */
-    __asm__ volatile("nop"); __asm__ volatile("nop");
-    __asm__ volatile("nop"); __asm__ volatile("nop");
-    __asm__ volatile("nop"); __asm__ volatile("nop");
-    __asm__ volatile("nop"); __asm__ volatile("nop");
-    __asm__ volatile("nop"); __asm__ volatile("nop");
+    if (s_dac_delay_us == 0) {
+        /* Fast mode: ~10 NOPs ~= 140ns at 72MHz */
+        __asm__ volatile("nop"); __asm__ volatile("nop");
+        __asm__ volatile("nop"); __asm__ volatile("nop");
+        __asm__ volatile("nop"); __asm__ volatile("nop");
+        __asm__ volatile("nop"); __asm__ volatile("nop");
+        __asm__ volatile("nop"); __asm__ volatile("nop");
+    } else {
+        /* Configurable delay: use busy-wait loop */
+        volatile uint32_t count = s_dac_delay_us * 12;  /* ~12 loops/us at 72MHz */
+        while (count--);
+    }
 }
 
 /* ============================================================================
