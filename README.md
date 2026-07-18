@@ -328,6 +328,12 @@ verify-dac7311idckr-demo/
 - **CH2（PB8/SCLK）**：SPI 时钟，16 个脉冲对应 16-bit 数据
 - **CH3（PB9/DIN）**：串行数据，MSB First
 
+## 实物测试（电压实测）
+
+![实物测试](images/pic2.jpg)
+
+上图为实际硬件测试，万用表量测 DAC 输出电压，验证 DAC3511 输出与代码设定值的一致性。
+
 ## 构建环境
 
 - **IDE**：RT-Thread Studio / Keil MDK
