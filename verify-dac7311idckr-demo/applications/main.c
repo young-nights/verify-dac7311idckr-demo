@@ -259,7 +259,7 @@ int main(void)
 /* ============================================================================ *  RT-Thread Shell Command: dac
  *  Usage:
  *    dac volt <value>     - Set output voltage (0.0 ~ 5.0V)
- *    dac raw <value>      - Set raw 12-bit value (0 ~ 4095)
+ *    dac raw <value>      - Set raw 14-bit value (0 ~ 16383)
  *    dac pct <value>      - Set percentage (0 ~ 100%)
  *    dac pd <mode>        - Power-down (0=normal, 1=1k, 2=100k, 3=HiZ)
  *    dac info             - Show current status
@@ -269,7 +269,7 @@ static int dac(int argc, char **argv)
     if (argc < 2) {
         rt_kprintf("Usage:\n");
         rt_kprintf("  dac volt <0.0~5.0>    Set voltage\n");
-        rt_kprintf("  dac raw  <0~4095>     Set raw value\n");
+        rt_kprintf("  dac raw  <0~16383>     Set raw value\n");
         rt_kprintf("  dac pct  <0~100>      Set percentage\n");
         rt_kprintf("  dac pd   <0~3>        Power-down mode\n");
         rt_kprintf("  dac info              Show status\n");
@@ -282,9 +282,9 @@ static int dac(int argc, char **argv)
         if (argc < 3) { rt_kprintf("Usage: dac volt <voltage>\n"); return -RT_ERROR; }
         float v = atof(argv[2]);
         dac7311_set_voltage(v);
-        rt_kprintf("[DAC] Voltage set to %.3fV (raw=%d)\n", dac7311_get_voltage(), (int)(v / DAC7311_VREF * 4095));
+        rt_kprintf("[DAC] Voltage set to %.3fV (raw=%d)\n", dac7311_get_voltage(), (int)(v / DAC7311_VREF * 16383));
     } else if (rt_strcmp(argv[1], "raw") == 0) {
-        if (argc < 3) { rt_kprintf("Usage: dac raw <0~4095>\n"); return -RT_ERROR; }
+        if (argc < 3) { rt_kprintf("Usage: dac raw <0~16383>\n"); return -RT_ERROR; }
         uint16_t val = atoi(argv[2]);
         dac7311_set_raw(val);
         rt_kprintf("[DAC] Raw set to %d (%.3fV)\n", val, dac7311_get_voltage());

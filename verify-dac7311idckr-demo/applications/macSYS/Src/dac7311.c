@@ -7,10 +7,10 @@
  * Date           Author       Notes
  * 2026-07-14     Administrator       DAC7311 driver for pump speed control
  *
- * DAC7311: 12-bit, single-channel, SPI DAC (Texas Instruments)
+ * DAC7311: 14-bit, single-channel, SPI DAC (Texas Instruments)
  * - SPI Mode 0 (CPOL=0, CPHA=0), MSB first
- * - 16-bit frame: [X X PD1 PD0 D11 D10 ... D0]
- * - VOUT = VREF * D / 4096 (VREF = VDD)
+ * - 16-bit frame: [X X PD1 PD0 D13 D12 ... D0]
+ * - VOUT = VREF * D / 16384 (VREF = VDD)
  *
  * Hardware:
  *   PB7  -> SYNC (chip select, active low)
@@ -155,11 +155,11 @@ void dac7311_set_voltage(float voltage)
     if (voltage < 0.0f) voltage = 0.0f;
     if (voltage > DAC7311_VOUT_MAX) voltage = DAC7311_VOUT_MAX;
 
-    /* Convert voltage to 12-bit value: D = V * 4096 / VREF */
+    /* Convert voltage to 14-bit value: D = V * 16384 / VREF */
     uint16_t value = (uint16_t)((voltage / DAC7311_VREF) * (DAC7311_RESOLUTION - 1) + 0.5f);
-    if (value > 4095) value = 4095;
+    if (value > 16383) value = 16383;
 
-    /* Build 16-bit frame: [XX PD1=0 PD0=0 D11..D0] */
+    /* Build 16-bit frame: [XX PD1=0 PD0=0 D13..D0] */
     uint16_t frame = (DAC7311_PD_NORMAL << 12) | value;
 
     /* Write to DAC */
@@ -174,7 +174,7 @@ void dac7311_set_voltage(float voltage)
 
 void dac7311_set_raw(uint16_t value)
 {
-    if (value > 4095) value = 4095;
+    if (value > 16383) value = 16383;
 
     uint16_t frame = (DAC7311_PD_NORMAL << 12) | value;
     dac7311_write_frame(frame);
