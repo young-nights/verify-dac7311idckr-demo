@@ -250,7 +250,7 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-      rt_thread_mdelay(1000);
+      rt_thread_mdelay(50);
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
