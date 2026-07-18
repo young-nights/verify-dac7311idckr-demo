@@ -315,6 +315,19 @@ verify-dac7311idckr-demo/
 └── README.md
 ```
 
+## 原理图
+
+![DAC3511 原理图](images/dac7311_schemtic.png)
+
+## SPI 协议波形（逻辑分析仪实测）
+
+![SPI 协议波形](images/pic1.png)
+
+上图为逻辑分析仪抓取的实际 SPI 通信波形，三通道分别为：
+- **CH1（PB7/SYNC）**：帧同步信号，下降沿开始一帧传输
+- **CH2（PB8/SCLK）**：SPI 时钟，16 个脉冲对应 16-bit 数据
+- **CH3（PB9/DIN）**：串行数据，MSB First
+
 ## 构建环境
 
 - **IDE**：RT-Thread Studio / Keil MDK
