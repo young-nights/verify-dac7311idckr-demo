@@ -439,10 +439,10 @@ static int dacdiag(int argc, char **argv)
     rt_kprintf("[RCC] GPIOB EN   = %s\n", (apb2enr & RCC_APB2ENR_IOPBEN) ? "YES" : "NO");
 
     /* Read GPIOB configuration registers */
-    rt_kprintf("[GPIOB] CRL      = 0x%08X  (pins 0-7)\n", (unsigned)port->CRL);
+    rt_kprintf("[GPIOB] CRL      = 0x%08X  (pins 0-7)\n",  (unsigned)port->CRL);
     rt_kprintf("[GPIOB] CRH      = 0x%08X  (pins 8-15)\n", (unsigned)port->CRH);
-    rt_kprintf("[GPIOB] IDR      = 0x%04X    (input state)\n", (unsigned)port->IDR);
-    rt_kprintf("[GPIOB] ODR      = 0x%04X    (output state)\n", (unsigned)port->ODR);
+    rt_kprintf("[GPIOB] IDR      = 0x%04X  (input state)\n", (unsigned)port->IDR);
+    rt_kprintf("[GPIOB] ODR      = 0x%04X  (output state)\n", (unsigned)port->ODR);
 
     /* Decode pin modes from CRH (pins 8,9 are in CRH) */
     uint32_t crh = port->CRH;
