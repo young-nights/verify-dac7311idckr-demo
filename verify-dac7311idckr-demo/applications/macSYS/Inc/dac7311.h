@@ -7,10 +7,13 @@
  * Date           Author       Notes
  * 2026-07-14     Administrator       DAC7311 driver for pump speed control
  *
- * DAC7311: 14-bit, single-channel, SPI DAC (Texas Instruments)
+ * DAC3511: 12-bit, single-channel, SPI DAC (Texas Instruments)
  * - SPI Mode 0 (CPOL=0, CPHA=0), MSB first
- * - 16-bit frame: [X X PD1 PD0 D13 D12 ... D0]
- * - VOUT = VREF * D / 16384 (VREF = VDD = 5V)
+ * - 16-bit frame: [M1 M0 D11 D10 ... D0 R R]
+ * - M1:M0 (D15:D14) = mode control (00=normal)
+ * - D11:D0 (D13:D2) = 12-bit data (value << 2)
+ * - R:R (D1:D0) = reserved (must be 0)
+ * - VOUT = VREF * D / 4096 (VREF = VDD = 5V)
  * - Output range: 0 ~ 5V
  *
  * Hardware connections:
