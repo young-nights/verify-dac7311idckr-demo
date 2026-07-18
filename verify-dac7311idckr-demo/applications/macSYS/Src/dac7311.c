@@ -5,11 +5,11 @@
  *
  * Change Logs:
  * Date           Author       Notes
- * 2026-07-14     Administrator       DAC7311 driver for pump speed control
+ * 2026-07-14     Administrator       DAC driver for pump speed control
  *
- * DAC7311: 14-bit, single-channel, SPI DAC (Texas Instruments)
+ * DAC: 14-bit, single-channel, SPI DAC
  * - SPI Mode 0 (CPOL=0, CPHA=0), MSB first
- * - 16-bit frame: [M1 M0 D11 D10 ... D0 R R]
+ * - 16-bit frame: [M1 M0 D13 D12 ... D1 D0 R R]
  * - VOUT = VREF * D / 16384 (VREF = VDD)
  *
  * Hardware:
@@ -80,7 +80,7 @@ static void dac_delay(void)
  * ===========================================================================*/
 
 /**
- * @brief  Write 16-bit frame to DAC7311 via software SPI.
+ * @brief  Write 16-bit frame to DAC via software SPI.
  *         Uses direct BSRR/BRR register access for deterministic timing.
  *         SPI Mode 0: CPOL=0, CPHA=0, MSB first.
  */
@@ -146,7 +146,7 @@ void dac7311_init(void)
     /* Output 0V */
     dac7311_set_voltage(0.0f);
 
-    rt_kprintf("[DAC7311] Initialized (open-drain + 5V pull-up), output=0.00V\n");
+    rt_kprintf("[DAC7311] Initialized, output=0.00V\n");
 }
 
 void dac7311_set_voltage(float voltage)
@@ -155,12 +155,12 @@ void dac7311_set_voltage(float voltage)
     if (voltage < 0.0f) voltage = 0.0f;
     if (voltage > DAC7311_VOUT_MAX) voltage = DAC7311_VOUT_MAX;
 
-    /* Convert voltage to 12-bit value: D = V * 4096 / VREF */
+    /* Convert voltage to 14-bit value: D = V * 16384 / VREF */
     uint16_t value = (uint16_t)((voltage / DAC7311_VREF) * (DAC7311_RESOLUTION - 1) + 0.5f);
-    if (value > 4095) value = 4095;
+    if (value > 16383) value = 16383;
 
-    /* Build 16-bit frame: [MODE(2) DATA(12) RSVD(2)]
-     * D15:D14 = mode, D13:D2 = data<<2, D1:D0 = 0 */
+    /* Build 16-bit frame: [MODE(2) DATA(14) RSVD(2)]
+     * D15:D14 = mode, D13:D0 = value<<2, D1:D0 = 0 */
     uint16_t frame = (DAC7311_PD_NORMAL << 14) | (value << 2);
 
     /* Write to DAC */
@@ -175,7 +175,7 @@ void dac7311_set_voltage(float voltage)
 
 void dac7311_set_raw(uint16_t value)
 {
-    if (value > 4095) value = 4095;
+    if (value > 16383) value = 16383;
 
     uint16_t frame = (DAC7311_PD_NORMAL << 14) | (value << 2);
     dac7311_write_frame(frame);

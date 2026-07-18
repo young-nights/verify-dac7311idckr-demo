@@ -5,15 +5,22 @@
  *
  * Change Logs:
  * Date           Author       Notes
- * 2026-07-14     Administrator       DAC7311 driver for pump speed control
+ * 2026-07-14     Administrator       DAC driver for pump speed control
  *
- * DAC3511: 12-bit, single-channel, SPI DAC (Texas Instruments)
+ * DAC: 14-bit, single-channel, SPI DAC
  * - SPI Mode 0 (CPOL=0, CPHA=0), MSB first
- * - 16-bit frame: [M1 M0 D11 D10 ... D0 R R]
+ * - 16-bit frame format:
+ *
+ *   Bit: 15 14 │ 13 12 11 10 9 8 7 6 5 4 3 2 │ 1 0
+ *        ──────┼──────────────────────────────┼─────
+ *        M1 M0 │ D13 D12 D11 ... D1 D0        │ R R
+ *        ──────┼──────────────────────────────┼─────
+ *        模式   │ 14-bit 有效数据 (value<<2)    │ 保留
+ *
  * - M1:M0 (D15:D14) = mode control (00=normal)
- * - D11:D0 (D13:D2) = 12-bit data (value << 2)
- * - R:R (D1:D0) = reserved (must be 0)
- * - VOUT = VREF * D / 4096 (VREF = VDD = 5V)
+ * - D13:D0 (D13:D2) = 14-bit data, value left-shifted by 2
+ * - R:R (D1:D0)     = reserved (written as 0)
+ * - VOUT = VREF * D / 16384 (VREF = VDD = 5V)
  * - Output range: 0 ~ 5V
  *
  * Hardware connections:
@@ -32,10 +39,10 @@ extern "C" {
 #endif
 
 /* ============================================================================
- *  DAC7311 Hardware Configuration
+ *  DAC Hardware Configuration
  * ===========================================================================*/
 #define DAC7311_VREF            5.0f        /* Reference voltage (V) = VDD */
-#define DAC7311_RESOLUTION      4096        /* 12-bit: 0 ~ 4095 */
+#define DAC7311_RESOLUTION      16384       /* 14-bit: 0 ~ 16383 (0x3FFF) */
 #define DAC7311_VOUT_MAX        DAC7311_VREF /* Maximum output voltage */
 
 /* Mode control (16-bit frame bits [15:14]) */
@@ -45,11 +52,11 @@ extern "C" {
 #define DAC7311_PD_HIZ          0x03        /* Power-down, high impedance */
 
 /*
- * DAC3511 16-bit frame format:
- *   D15 D14 | D13 D12 D11 D10 D9 D8 D7 D6 D5 D4 D3 D2 | D1 D0
- *   [MODE]  | [12-bit data, MSB first]                  | [RSVD]
+ * DAC 16-bit frame format:
+ *   D15 D14 | D13 D12 D11 ... D1 D0 | (bit1:0)
+ *   [MODE]  | [14-bit data << 2]    | [RSVD=0]
  *
- *   value (0~4095) is left-shifted by 2 to occupy D13:D2
+ *   value (0~16383) is left-shifted by 2 to occupy D13:D2
  *   frame = (mode << 14) | (value << 2)
  */
 
@@ -58,7 +65,7 @@ extern "C" {
  * ===========================================================================*/
 
 /**
- * @brief  Initialize DAC7311 GPIO pins (PB7=SYNC, PB8=SCLK, PB9=DIN).
+ * @brief  Initialize DAC GPIO pins (PB7=SYNC, PB8=SCLK, PB9=DIN).
  *         Sets output to 0V.
  */
 void dac7311_init(void);
@@ -96,8 +103,8 @@ void dac7311_power_down(uint8_t mode);
 float dac7311_get_voltage(void);
 
 /**
- * @brief  Write raw 16-bit frame directly to DAC7311.
- *         Frame format: [X X PD1 PD0 D11 D10 ... D0]
+ * @brief  Write raw 16-bit frame directly to DAC.
+ *         Frame format: [M1 M0 D13 D12 ... D0 R R]
  * @param  frame  16-bit frame to write.
  */
 void dac7311_write_raw_frame(uint16_t frame);

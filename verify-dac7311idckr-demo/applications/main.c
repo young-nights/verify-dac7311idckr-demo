@@ -74,7 +74,7 @@ static void wave_build_lut(wave_type_t type, float amp, float offset)
         if (v < 0.0f) v = 0.0f;
         if (v > DAC7311_VREF) v = DAC7311_VREF;
 
-        s_wave_lut[i] = (uint16_t)((v / DAC7311_VREF) * 4095.0f + 0.5f);
+        s_wave_lut[i] = (uint16_t)((v / DAC7311_VREF) * 16383.0f + 0.5f);
     }
 }
 
