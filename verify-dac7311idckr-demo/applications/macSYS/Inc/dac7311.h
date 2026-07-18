@@ -83,6 +83,13 @@ void dac7311_power_down(uint8_t mode);
  */
 float dac7311_get_voltage(void);
 
+/**
+ * @brief  Write raw 16-bit frame directly to DAC7311.
+ *         Frame format: [X X PD1 PD0 D11 D10 ... D0]
+ * @param  frame  16-bit frame to write.
+ */
+void dac7311_write_raw_frame(uint16_t frame);
+
 #ifdef __cplusplus
 }
 #endif

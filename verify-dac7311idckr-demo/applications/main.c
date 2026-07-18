@@ -155,6 +155,51 @@ static const char* wave_type_name(wave_type_t t)
     }
 }
 
+/* ============================================================================
+ *  SPI Protocol Test Mode (repeat fixed frame for oscilloscope capture)
+ * ===========================================================================*/
+static rt_timer_t  s_test_timer  = RT_NULL;
+static uint16_t    s_test_frame  = 0x8000;   /* default: 2.5V mid-scale */
+static uint32_t    s_test_count = 0;
+
+static void test_timer_cb(void *parameter)
+{
+    (void)parameter;
+    dac7311_write_raw_frame(s_test_frame);
+    s_test_count++;
+}
+
+static void test_start(uint16_t frame, uint32_t interval_ms)
+{
+    if (s_test_timer != RT_NULL) {
+        rt_timer_stop(s_test_timer);
+        rt_timer_delete(s_test_timer);
+        s_test_timer = RT_NULL;
+    }
+
+    s_test_frame = frame;
+    s_test_count = 0;
+
+    s_test_timer = rt_timer_create("spitest", test_timer_cb,
+                                    RT_NULL, interval_ms,
+                                    RT_TIMER_FLAG_PERIODIC | RT_TIMER_FLAG_SOFT_TIMER);
+    if (s_test_timer != RT_NULL) {
+        rt_timer_start(s_test_timer);
+    } else {
+        rt_kprintf("[TEST] ERROR: Failed to create timer!\n");
+    }
+}
+
+static void test_stop(void)
+{
+    if (s_test_timer != RT_NULL) {
+        rt_timer_stop(s_test_timer);
+        rt_timer_delete(s_test_timer);
+        s_test_timer = RT_NULL;
+    }
+    s_test_count = 0;
+}
+
 /**
   * @brief  The application entry point.
   * @retval int
@@ -228,6 +273,7 @@ static int dac(int argc, char **argv)
         rt_kprintf("  dac pd   <0~3>        Power-down mode\n");
         rt_kprintf("  dac info              Show status\n");
         rt_kprintf("  dac wave <type> [freq] [amp] [offset]  Waveform output\n");
+        rt_kprintf("  dac test [interval_ms] [hex_frame]  SPI protocol test\n");
         return -RT_ERROR;
     }
 
@@ -308,6 +354,49 @@ static int dac(int argc, char **argv)
             rt_kprintf("[WAVE] Range: %.3f ~ %.3f V\n",
                        offset - amp < 0.0f ? 0.0f : offset - amp,
                        offset + amp > DAC7311_VREF ? DAC7311_VREF : offset + amp);
+        }
+    } else if (rt_strcmp(argv[1], "test") == 0) {
+        if (argc < 3) {
+            rt_kprintf("Usage:\n");
+            rt_kprintf("  dac test [interval_ms] [hex_frame]  Repeat SPI frame\n");
+            rt_kprintf("  dac test stop                       Stop test mode\n");
+            rt_kprintf("  dac test info                       Show status\n");
+            rt_kprintf("  Defaults: interval=10ms, frame=0x8000 (2.5V)\n");
+            rt_kprintf("\n  Probe: PB7=SYNC, PB8=SCLK, PB9=DIN\n");
+            return -RT_ERROR;
+        }
+
+        if (rt_strcmp(argv[2], "stop") == 0) {
+            test_stop();
+            rt_kprintf("[TEST] Stopped (sent %d frames)\n", (int)s_test_count);
+        } else if (rt_strcmp(argv[2], "info") == 0) {
+            if (s_test_timer == RT_NULL) {
+                rt_kprintf("[TEST] Idle\n");
+            } else {
+                rt_kprintf("[TEST] Active\n");
+                rt_kprintf("  Frame:    0x%04X\n", s_test_frame);
+                rt_kprintf("  Sent:     %d frames\n", (int)s_test_count);
+                rt_kprintf("  Probe:    PB7=SYNC, PB8=SCLK, PB9=DIN\n");
+                rt_kprintf("  Trigger:  Set scope to trigger on SYNC falling edge\n");
+            }
+        } else {
+            uint32_t interval = (argc > 2) ? atoi(argv[2]) : 10;
+            uint16_t frame    = (argc > 3) ? (uint16_t)strtol(argv[3], RT_NULL, 16) : 0x8000;
+            if (interval < 1) interval = 1;
+            if (interval > 10000) interval = 10000;
+
+            test_start(frame, interval);
+            rt_kprintf("[TEST] Started: frame=0x%04X, interval=%dms\n", frame, (int)interval);
+            rt_kprintf("[TEST] Probe: PB7=SYNC, PB8=SCLK, PB9=DIN\n");
+            rt_kprintf("[TEST] Scope trigger: SYNC falling edge\n");
+            rt_kprintf("[TEST] Expected: 16 SCLK cycles per SYNC low pulse\n");
+            rt_kprintf("[TEST] Frame bits: ");
+            for (int b = 15; b >= 0; b--) {
+                rt_kprintf("%d", (frame >> b) & 1);
+                if (b == 14 || b == 12) rt_kprintf(" ");  /* visual separator */
+            }
+            rt_kprintf("\n");
+            rt_kprintf("[TEST]          [X][X][PD1][PD0][D11..D0]\n");
         }
     } else {
         rt_kprintf("Unknown command: %s\n", argv[1]);

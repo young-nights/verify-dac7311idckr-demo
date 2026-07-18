@@ -183,3 +183,8 @@ float dac7311_get_voltage(void)
 {
     return s_dac_voltage;
 }
+
+void dac7311_write_raw_frame(uint16_t frame)
+{
+    dac7311_write_frame(frame);
+}
