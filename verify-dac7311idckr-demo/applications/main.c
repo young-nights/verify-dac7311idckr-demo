@@ -159,7 +159,7 @@ static const char* wave_type_name(wave_type_t t)
  *  SPI Protocol Test Mode (repeat fixed frame for oscilloscope capture)
  * ===========================================================================*/
 static rt_timer_t  s_test_timer  = RT_NULL;
-static uint16_t    s_test_frame  = 0x8000;   /* default: 2.5V mid-scale */
+static uint16_t    s_test_frame  = 0x2000;   /* default: 2.5V mid-scale, value=2048<<2 */
 static uint32_t    s_test_count = 0;
 
 static void test_timer_cb(void *parameter)
@@ -362,7 +362,7 @@ static int dac(int argc, char **argv)
             rt_kprintf("  dac test [interval_ms] [hex_frame] [clk_us]  Repeat SPI frame\n");
             rt_kprintf("  dac test stop                                Stop test mode\n");
             rt_kprintf("  dac test info                                Show status\n");
-            rt_kprintf("  Defaults: interval=10ms, frame=0x8000, clk=0 (fast)\n");
+            rt_kprintf("  Defaults: interval=10ms, frame=0x2000 (2.5V), clk=0 (fast)\n");
             rt_kprintf("  clk_us: SCLK high/low time in us (0=fast, 1000=1ms per half-clock)\n");
             rt_kprintf("\n  Probe: PB7=SYNC, PB8=SCLK, PB9=DIN\n");
             return -RT_ERROR;
@@ -388,7 +388,7 @@ static int dac(int argc, char **argv)
             }
         } else {
             uint32_t interval = (argc > 2) ? atoi(argv[2]) : 10;
-            uint16_t frame    = (argc > 3) ? (uint16_t)strtol(argv[3], RT_NULL, 16) : 0x8000;
+            uint16_t frame    = (argc > 3) ? (uint16_t)strtol(argv[3], RT_NULL, 16) : 0x2000;
             uint32_t clk_us   = (argc > 4) ? atoi(argv[4]) : 0;
             if (interval < 1) interval = 1;
             if (interval > 10000) interval = 10000;
@@ -410,10 +410,10 @@ static int dac(int argc, char **argv)
             rt_kprintf("[TEST] Frame bits: ");
             for (int b = 15; b >= 0; b--) {
                 rt_kprintf("%d", (frame >> b) & 1);
-                if (b == 14 || b == 12) rt_kprintf(" ");
+                if (b == 14 || b == 2) rt_kprintf(" ");
             }
             rt_kprintf("\n");
-            rt_kprintf("[TEST]          [X][X][PD1][PD0][D11..D0]\n");
+            rt_kprintf("[TEST]          [M1 M0][D11 D10 .. D1 D0][R R]\n");
         }
     } else {
         rt_kprintf("Unknown command: %s\n", argv[1]);

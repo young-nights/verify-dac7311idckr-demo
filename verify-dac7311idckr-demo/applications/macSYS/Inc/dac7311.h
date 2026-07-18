@@ -32,14 +32,23 @@ extern "C" {
  *  DAC7311 Hardware Configuration
  * ===========================================================================*/
 #define DAC7311_VREF            5.0f        /* Reference voltage (V) = VDD */
-#define DAC7311_RESOLUTION      16384       /* 14-bit: 0 ~ 16383 (0x3FFF) */
+#define DAC7311_RESOLUTION      4096        /* 12-bit: 0 ~ 4095 */
 #define DAC7311_VOUT_MAX        DAC7311_VREF /* Maximum output voltage */
 
-/* Power-down modes (16-bit frame bits [13:12]) */
+/* Mode control (16-bit frame bits [15:14]) */
 #define DAC7311_PD_NORMAL       0x00        /* Normal operation */
 #define DAC7311_PD_1K           0x01        /* Power-down with 1k to GND */
 #define DAC7311_PD_100K         0x02        /* Power-down with 100k to GND */
 #define DAC7311_PD_HIZ          0x03        /* Power-down, high impedance */
+
+/*
+ * DAC3511 16-bit frame format:
+ *   D15 D14 | D13 D12 D11 D10 D9 D8 D7 D6 D5 D4 D3 D2 | D1 D0
+ *   [MODE]  | [12-bit data, MSB first]                  | [RSVD]
+ *
+ *   value (0~4095) is left-shifted by 2 to occupy D13:D2
+ *   frame = (mode << 14) | (value << 2)
+ */
 
 /* ============================================================================
  *  Public Functions
