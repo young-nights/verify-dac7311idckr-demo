@@ -11,15 +11,13 @@
  * - SPI Mode 0 (CPOL=0, CPHA=0), MSB first
  * - 16-bit frame format:
  *
- *   Bit: 15 14 │ 13 12 11 10 9 8 7 6 5 4 3 2 │ 1 0
- *        ──────┼──────────────────────────────┼─────
- *        M1 M0 │ D13 D12 D11 ... D1 D0        │ R R
- *        ──────┼──────────────────────────────┼─────
- *        模式   │ 14-bit 有效数据 (value<<2)    │ 保留
+ *   Bit: 15 14 │ 13 12 11 10 9 8 7 6 5 4 3 2 1 0
+ *        ──────┼──────────────────────────────────
+ *        M1 M0 │ D13 D12 D11 ... D1 D0
+ *        模式   │ 14-bit 有效数据 (直接放入)
  *
  * - M1:M0 (D15:D14) = mode control (00=normal)
- * - D13:D0 (D13:D2) = 14-bit data, value left-shifted by 2
- * - R:R (D1:D0)     = reserved (written as 0)
+ * - D13:D0 (D13:D0) = 14-bit data, directly placed (no shift)
  * - VOUT = VREF * D / 16384 (VREF = VDD = 5V)
  * - Output range: 0 ~ 5V
  *
@@ -53,11 +51,11 @@ extern "C" {
 
 /*
  * DAC 16-bit frame format:
- *   D15 D14 | D13 D12 D11 ... D1 D0 | (bit1:0)
- *   [MODE]  | [14-bit data << 2]    | [RSVD=0]
+ *   D15 D14 | D13 D12 D11 ... D1 D0
+ *   [MODE]  | [14-bit data (direct)]
  *
- *   value (0~16383) is left-shifted by 2 to occupy D13:D2
- *   frame = (mode << 14) | (value << 2)
+ *   value (0~16383) is placed directly into D13:D0
+ *   frame = (mode << 14) | (value & 0x3FFF)
  */
 
 /* ============================================================================
@@ -104,7 +102,7 @@ float dac7311_get_voltage(void);
 
 /**
  * @brief  Write raw 16-bit frame directly to DAC.
- *         Frame format: [M1 M0 D13 D12 ... D0 R R]
+ *         Frame format: [M1 M0 D13 D12 ... D1 D0]
  * @param  frame  16-bit frame to write.
  */
 void dac7311_write_raw_frame(uint16_t frame);
